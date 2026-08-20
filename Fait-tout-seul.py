@@ -2,12 +2,29 @@ import cv2
 import numpy as np
 import pyautogui
 import pygetwindow as gw
+import random
 import time
 
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def trouver_image(region_fenetre, template_path):
+	capture = pyautogui.screenshot(region=region_fenetre)
+	ecran = cv2.cvtColor(np.array(capture), cv2.COLOR_RGB2BGR)
+	template = cv2.imread(template_path)
+	h, w = template.shape[:2]
+	result = cv2.matchTemplate(ecran, template, cv2.TM_CCOEFF_NORMED)
+	# Récupération de toutes les positions >= 0.9
+	loc = np.where(result >= 0.9)
+	pts = list(zip(*loc[::-1]))  # Liste de tuples (x, y)
+	if pts:
+		# Sélection aléatoire d'une position parmi les correspondances
+		top_left = random.choice(pts)
+		return (top_left[0] + w // 2, top_left[1] + h // 2)
+	else:
+		return None
+
+def trouver_image_V0(region_fenetre, template_path):
 	capture = pyautogui.screenshot(region=region_fenetre)
 	ecran = cv2.cvtColor(np.array(capture), cv2.COLOR_RGB2BGR)
 	template = cv2.imread(template_path)
@@ -76,7 +93,7 @@ else:
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 # 1.	Boucle
 
-boucles = 500
+boucles = 200
 while boucles > 0:
 	boucles -= 1
 
