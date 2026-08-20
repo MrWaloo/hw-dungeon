@@ -14,7 +14,7 @@ def trouver_image(region_fenetre, template_path):
 	h, w = template.shape[:2]
 	result = cv2.matchTemplate(ecran, template, cv2.TM_CCOEFF_NORMED)
 	min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-	print(f"Recherche de l'image {template_path} : max_val = {max_val}, max_loc = {max_loc}")
+	#print(f"Recherche de l'image {template_path} : max_val = {max_val}, max_loc = {max_loc}")
 	if max_val >= 0.9:
 		top_left = max_loc
 		return (top_left[0] + w // 2, top_left[1] + h // 2)  # Retourne le centre de l'image trouvée
@@ -29,7 +29,7 @@ def attendre_image(region_fenetre, template_path, timeout=10):
 		position = trouver_image(region_fenetre, template_path)
 		if position:
 			return position
-		time.sleep(0.5)  # Attendre un peu avant de réessayer
+		time.sleep(0.2)  # Attendre un peu avant de réessayer
 	return None  # Retourne None si l'image n'est pas trouvée dans le délai imparti
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
@@ -76,7 +76,7 @@ else:
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 # 1.	Boucle
 
-boucles = 3
+boucles = 500
 while boucles > 0:
 	boucles -= 1
 
@@ -86,11 +86,34 @@ while boucles > 0:
 # - ajouter un timeout pour éviter une boucle infinie si l'image n'est pas trouvée
 # - prévoir de valider la porte et de récupérer l'or
 
-	pos = attendre_image(region_fenetre, 'screenshots/Door To battle.png', 3)
-	if pos:
-		clic_position(pos)
-		print("Porte trouvée.")
-	else:
+	pos_Door = None
+	pos_Activate = None
+	activated = False
+	start_time = time.time()
+	while time.time() - start_time < 20:  # Timeout de 20 secondes
+		pos_Door = attendre_image(region_fenetre, 'screenshots/Door To battle.png', 1)
+		if pos_Door:
+			clic_position(pos_Door)
+			print(f"Porte trouvée, plus que {boucles} boucles restantes.")
+			break
+		if not activated:
+			pos_Activate = attendre_image(region_fenetre, 'screenshots/Button Activate.png', 1)
+			if pos_Activate:
+				start_time = time.time()
+				clic_position(pos_Activate)
+				pos_Collect = attendre_image(region_fenetre, 'screenshots/Button Collect.png', 10)
+				if pos_Collect:
+					clic_position(pos_Collect)
+					print("Activation et collecte effectuées.")
+					time.sleep(1.0)  # Attendre un peu après la collecte
+					activated = True
+				else:
+					print("Bouton 'Collect' non trouvé après activation.")
+					exit(1)
+				continue
+
+	
+	if not pos_Door:
 		print("Porte non trouvée dans le délai imparti.")
 		exit(1)
 
@@ -159,7 +182,7 @@ while boucles > 0:
 	start_time = time.time()
 	while time.time() - start_time < 100:  # Timeout de 100 secondes
 		if not AUTO_green:
-			pos_AUTO = attendre_image(region_fenetre, 'screenshots/Button AUTO gray.png', 1)
+			pos_AUTO = attendre_image(region_fenetre, 'screenshots/Button AUTO gray.png', 3)
 			if pos_AUTO:
 				if trouver_image(region_fenetre, 'screenshots/Button AUTO green.png') is None:
 					clic_position(pos_AUTO)
@@ -167,7 +190,7 @@ while boucles > 0:
 		pos_OK = attendre_image(region_fenetre, 'screenshots/Button OK.png', 1)
 		if pos_OK:
 			clic_position(pos_OK)
-			time.sleep(2)
+			time.sleep(1.0)  # Attendre un peu après le clic sur OK
 			break
 
 	if not pos_AUTO and not pos_OK:
