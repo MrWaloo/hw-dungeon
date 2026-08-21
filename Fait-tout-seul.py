@@ -24,20 +24,6 @@ def trouver_image(region_fenetre, template_path):
 	else:
 		return None
 
-def trouver_image_V0(region_fenetre, template_path):
-	capture = pyautogui.screenshot(region=region_fenetre)
-	ecran = cv2.cvtColor(np.array(capture), cv2.COLOR_RGB2BGR)
-	template = cv2.imread(template_path)
-	h, w = template.shape[:2]
-	result = cv2.matchTemplate(ecran, template, cv2.TM_CCOEFF_NORMED)
-	min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-	#print(f"Recherche de l'image {template_path} : max_val = {max_val}, max_loc = {max_loc}")
-	if max_val >= 0.9:
-		top_left = max_loc
-		return (top_left[0] + w // 2, top_left[1] + h // 2)  # Retourne le centre de l'image trouvée
-	else:
-		return None
-
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def attendre_image(region_fenetre, template_path, timeout=10):
@@ -93,9 +79,9 @@ else:
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 # 1.	Boucle
 
-boucles = 200
-while boucles > 0:
-	boucles -= 1
+battles = 200
+while battles > 0:
+	battles -= 1
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 # 2.	Trouver la porte (drapeau « to battle ! »)
@@ -111,7 +97,7 @@ while boucles > 0:
 		pos_Door = attendre_image(region_fenetre, 'screenshots/Door To battle.png', 1)
 		if pos_Door:
 			clic_position(pos_Door)
-			print(f"Porte trouvée, plus que {boucles} boucles restantes.")
+			print(f"{time.strftime('%H:%M:%S')}: Porte trouvée, plus que {battles} battailles restantes.")
 			break
 		if not activated:
 			pos_Activate = attendre_image(region_fenetre, 'screenshots/Button Activate.png', 1)
@@ -140,7 +126,7 @@ while boucles > 0:
 	pos_Attack = None
 	pos_Accept = None
 	start_time = time.time()
-	while time.time() - start_time < 10:  # Timeout de 10 secondes
+	while time.time() - start_time < 12:  # Timeout de 12 secondes
 		pos_Attack = attendre_image(region_fenetre, 'screenshots/Button Attack.png', 1)
 		if pos_Attack:
 			clic_position(pos_Attack)
@@ -163,7 +149,7 @@ while boucles > 0:
 	pos_ToBattle = None
 	pos_Accept = None
 	start_time = time.time()
-	while time.time() - start_time < 10:  # Timeout de 10 secondes
+	while time.time() - start_time < 12:  # Timeout de 12 secondes
 		pos_ToBattle = attendre_image(region_fenetre, 'screenshots/Button To battle.png', 1)
 		if pos_ToBattle:
 			clic_position(pos_ToBattle)
