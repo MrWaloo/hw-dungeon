@@ -129,7 +129,7 @@ Note:
 Note:  
 - The script restarts the loop from the beginning.
 
-## Adjusting Screenshots for Your Resolution
+## Adjusting screenshots for your resolution
 
 If the script fails to detect buttons, your screenshots do not match your current resolution or language settings. Replace the image files in the "screenshots" folder with new captures suited to your configuration.
 
