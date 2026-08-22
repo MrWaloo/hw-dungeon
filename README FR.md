@@ -121,8 +121,8 @@ Remarque :
 
 |  |  |  |
 | -- | -- | -- |
-| Activation du mode "AUTO" | screenshots/Button AUTO gray.png | ![](screenshots/Button%20AUTO%20gray.png) |
-| Vérification du mode "AUTO" | screenshots/Button AUTO green.png | ![](screenshots/Button%20AUTO%20green.png) |
+| Activation du mode "AUTO" | screenshots/Button AUTO gray.png | ![](screenshots/Button%20Auto%20gray.png) |
+| Vérification du mode "AUTO" | screenshots/Button AUTO green.png | ![](screenshots/Button%20Auto%20green.png) |
 | Puis... |  |  |
 | Clic sur le bouton "OK" | screenshots/Button OK.png | ![](screenshots/Button%20OK.png) |
 
