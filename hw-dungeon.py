@@ -2,13 +2,13 @@ import random
 import time
 import cv2
 import numpy as np
-import pyAutogui
+import pyautogui
 import pygetwindow as gw
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def find_image(window_region, template_path):
-	screenshot = pyAutogui.screenshot(region=window_region)
+	screenshot = pyautogui.screenshot(region=window_region)
 	screen = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 	template = cv2.imread(template_path)
 	h, w = template.shape[:2]
@@ -38,7 +38,7 @@ def wait_for_image(window_region, template_path, timeout=10):
 
 def click_position(position):
 	if position:
-		pyAutogui.click(position[0], position[1])
+		pyautogui.click(position[0], position[1])
 	else:
 		print("Position not found for click.")
 
