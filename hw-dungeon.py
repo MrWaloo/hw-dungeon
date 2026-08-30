@@ -11,6 +11,7 @@ def find_image(window_region, template_path):
 	screenshot = pyautogui.screenshot(region=window_region)
 	screen = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 	template = cv2.imread(template_path)
+	assert template is not None
 	h, w = template.shape[:2]
 	result = cv2.matchTemplate(screen, template, cv2.TM_CCOEFF_NORMED)
 	# Get all positions >= 0.9
@@ -96,7 +97,7 @@ while True:
 		if pos_door:
 			click_position(pos_door)
 			print(
-				f"{time.strftime('%H:%M:%S')}: Door found,"
+				f"{time.strftime('%Y-%m-%d %H:%M:%S')}: Door found,"
 				f" starting battle #{battles}."
 			)
 			break
