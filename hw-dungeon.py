@@ -80,6 +80,7 @@ else:
 # 1. Loop
 
 battles = 0
+retries = 0
 while True:
 	battles += 1
 
@@ -149,7 +150,12 @@ while True:
 		print(
 			"'Attack' or 'Accept this fate' button not found within the timeout."
 		)
-		exit(1)
+		retries += 1
+		if retries >= 3:
+			exit(1)
+		print(f"Retrying... Attempt {retries} of 3.")
+		battles -= 1  # Decrement battles count since this attempt failed
+		continue
 
 	elif pos_accept:
 		continue  # Restart the loop after accepting fate
@@ -157,6 +163,7 @@ while True:
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 	# 4. "To battle" or "Accept this fate" button
 
+	retries = 0
 	pos_to_battle = None
 	pos_accept = None
 	start_time = time.time()
@@ -199,12 +206,12 @@ while True:
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 	# 6. "Auto" or "OK" button
 
-	is_Auto_green = False
+	Auto_is_green = False
 	pos_Auto = None
 	pos_ok = None
 	start_time = time.time()
 	while time.time() - start_time < 100:  # 100-second timeout
-		if not is_Auto_green:
+		if not Auto_is_green:
 			pos_Auto = wait_for_image(
 				window_region, 'screenshots/Button Auto gray.png', 3
 			)
@@ -216,7 +223,7 @@ while True:
 					is None
 				):
 					click_position(pos_Auto)
-					is_Auto_green = True
+					Auto_is_green = True
 		pos_ok = wait_for_image(window_region, 'screenshots/Button OK.png', 1)
 		if pos_ok:
 			click_position(pos_ok)

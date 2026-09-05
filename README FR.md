@@ -2,7 +2,7 @@
 
 Ce script python permet d'automatiser les combats du donjon dans le jeu Hero Wars.
 
-Il fonctionne sous Windows 11.  
+Il fonctionne sous Windows 10 ou 11.  
 Il s'appuie sur la reconnaissance des captures d'écran partielles dans le répertoire "screenshots" pour savoir où cliquer sur l'écran.  
 Ces captures faites tiennent compte de la taille de la fenêtre du jeu. Les captures fournies avec le script sont faites pour une version en anglais sur un écran de résolution 2560 * 1440 (2K) avec la fenêtre du jeu maximisée :
 

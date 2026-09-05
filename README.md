@@ -2,7 +2,7 @@
 
 This Python script Automates Dungeon battles in the game Hero Wars.
 
-It runs on Windows 11.  
+It runs on Windows 10 or 11.  
 It relies on partial screenshot recognition from the "screenshots" folder to identify where to click on the screen.  
 The provided screenshots account for the game's window size. They were taken from an English version of the game on a 2560 x 1440 (2K) resolution screen with the game window maximized:
 
