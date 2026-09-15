@@ -11,13 +11,14 @@ def find_image(window_region, template_path):
 	screenshot = pyautogui.screenshot(region=window_region)
 	screen = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 	template = cv2.imread(template_path)
-	assert template is not None
+	if template is None:
+		print(f"Template image {template_path} not found.")
+		return None
 	h, w = template.shape[:2]
 	result = cv2.matchTemplate(screen, template, cv2.TM_CCOEFF_NORMED)
 	# Get all positions >= 0.9
 	loc = np.where(result >= 0.9)
-	pts = list(zip(*loc[::-1]))  # List of tuples (x, y)
-	if pts:
+	if pts := list(zip(*loc[::-1])): # List of tuples (x, y)
 		# Randomly select a position among the matches
 		top_left = random.choice(pts)
 		return (top_left[0] + w // 2, top_left[1] + h // 2)
@@ -29,8 +30,7 @@ def find_image(window_region, template_path):
 def wait_for_image(window_region, template_path, timeout=10):
 	start_time = time.time()
 	while time.time() - start_time < timeout:
-		position = find_image(window_region, template_path)
-		if position:
+		if position := find_image(window_region, template_path):
 			return position
 		time.sleep(0.2)  # Wait a bit before retrying
 	return None  # Return None if image is not found within the timeout
@@ -46,8 +46,7 @@ def click_position(position):
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def click_image(window_region, template_path):
-	position = find_image(window_region, template_path)
-	if position:
+	if position := find_image(window_region, template_path):
 		click_position(position)
 	else:
 		print(f"Image {template_path} not found on screen.")
@@ -55,10 +54,8 @@ def click_image(window_region, template_path):
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 # 0. Find the window and activate it
 
-# 1. Retrieve the window by its exact or partial title
-windows = gw.getWindowsWithTitle('Hero Wars | Online action game | RPG')
-
-if windows:
+# Retrieve the window by its exact or partial title
+if windows := gw.getWindowsWithTitle('Hero Wars | Online action game | RPG'):
 	window = windows[0]
 
 	# Ensure the window is not minimized
@@ -69,7 +66,7 @@ if windows:
 	window.activate()
 	time.sleep(1.0)
 
-	# 2. Extract coordinates and dimensions: (left, top, width, height)
+	# Extract coordinates and dimensions: (left, top, width, height)
 	window_region = (window.left, window.top, window.width, window.height)
 
 else:
@@ -77,25 +74,40 @@ else:
 	exit(1)
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-# 1. Loop
+# 1. Divination Cards
+if pos_oracle := wait_for_image(window_region, 'screenshots/Button Oracle\'s Trials.png', 1):
+	click_position(pos_oracle)
+
+	while pos_claim := wait_for_image(window_region, 'screenshots/Button Claim Divination Card.png', 2):
+		click_position(pos_claim)
+		time.sleep(0.5)  # Wait a bit after clicking claim
+
+	if pos_close := wait_for_image(window_region, 'screenshots/Button Close Oracle\'s Trials.png', 1):
+		click_position(pos_close)
+		time.sleep(0.5)  # Wait a bit after clicking close
+	else:
+		print("'Close' button not found after claiming divination cards.")
+		exit(1)
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+# 2. Loop
 
 battles = 0
 retries = 0
+door_found = None
 while True:
 	battles += 1
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 2. Find the door ("To battle!" flag) or activate the door to be activated
+	# 3. Find the door ("To battle!" flag) or activate the door to be activated
 
 	pos_door = None
 	pos_activate = None
 	is_activated = False
 	start_time = time.time()
 	while time.time() - start_time < 20:  # 20-second timeout
-		pos_door = wait_for_image(
-			window_region, 'screenshots/Door To battle.png', 1
-		)
-		if pos_door:
+		door_priority = door_found is not None and (battles - door_found) % 10 == 0
+		if (not door_priority or is_activated) and (pos_door := wait_for_image(window_region, 'screenshots/Door To battle.png', 1)):
 			click_position(pos_door)
 			print(
 				f"{time.strftime('%Y-%m-%d %H:%M:%S')}: Door found,"
@@ -103,16 +115,11 @@ while True:
 			)
 			break
 		if not is_activated:
-			pos_activate = wait_for_image(
-				window_region, 'screenshots/Button Activate.png', 1
-			)
-			if pos_activate:
+			if pos_activate := wait_for_image(window_region, 'screenshots/Button Activate.png', 1):
+				door_found = battles  # Record the battle number when the door was found
 				start_time = time.time()
 				click_position(pos_activate)
-				pos_collect = wait_for_image(
-					window_region, 'screenshots/Button Collect.png', 10
-				)
-				if pos_collect:
+				if pos_collect := wait_for_image(window_region, 'screenshots/Button Collect.png', 10):
 					click_position(pos_collect)
 					print("Activation and collection completed.")
 					time.sleep(1.0)  # Wait a bit after collection
@@ -127,29 +134,21 @@ while True:
 		exit(1)
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 3. "Attack" or "Accept this fate" button
+	# 4. "Attack" or "Accept this fate" button
 
 	pos_attack = None
 	pos_accept = None
 	start_time = time.time()
 	while time.time() - start_time < 12:  # 12-second timeout
-		pos_attack = wait_for_image(
-			window_region, 'screenshots/Button Attack.png', 1
-		)
-		if pos_attack:
+		if pos_attack := wait_for_image(window_region, 'screenshots/Button Attack.png', 1):
 			click_position(pos_attack)
 			break
-		pos_accept = wait_for_image(
-			window_region, 'screenshots/Button Accept this fate.png', 1
-		)
-		if pos_accept:
+		if pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1):
 			click_position(pos_accept)
 			break
 
 	if not pos_attack and not pos_accept:
-		print(
-			"'Attack' or 'Accept this fate' button not found within the timeout."
-		)
+		print("'Attack' or 'Accept this fate' button not found within the timeout.")
 		retries += 1
 		if retries >= 3:
 			exit(1)
@@ -161,23 +160,17 @@ while True:
 		continue  # Restart the loop after accepting fate
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 4. "To battle" or "Accept this fate" button
+	# 5. "To battle" or "Accept this fate" button
 
 	retries = 0
 	pos_to_battle = None
 	pos_accept = None
 	start_time = time.time()
 	while time.time() - start_time < 12:  # 12-second timeout
-		pos_to_battle = wait_for_image(
-			window_region, 'screenshots/Button To battle.png', 1
-		)
-		if pos_to_battle:
+		if pos_to_battle := wait_for_image(window_region, 'screenshots/Button To battle.png', 1):
 			click_position(pos_to_battle)
 			break
-		pos_accept = wait_for_image(
-			window_region, 'screenshots/Button Accept this fate.png', 1
-		)
-		if pos_accept:
+		if pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1):
 			click_position(pos_accept)
 			break
 
@@ -192,19 +185,16 @@ while True:
 		continue  # Restart the loop after accepting fate
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 5. "To battle" button
+	# 6. "To battle" button
 
-	pos_to_battle = wait_for_image(
-		window_region, 'screenshots/Button To battle.png', 3
-	)
-	if pos_to_battle:
+	if pos_to_battle := wait_for_image(window_region, 'screenshots/Button To battle.png', 3):
 		click_position(pos_to_battle)
 	else:
 		print("'To battle' button not found within the timeout.")
 		exit(1)
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 6. "Auto" or "OK" button
+	# 7. "Auto" or "OK" button
 
 	Auto_is_green = False
 	pos_Auto = None
@@ -212,20 +202,11 @@ while True:
 	start_time = time.time()
 	while time.time() - start_time < 100:  # 100-second timeout
 		if not Auto_is_green:
-			pos_Auto = wait_for_image(
-				window_region, 'screenshots/Button Auto gray.png', 3
-			)
-			if pos_Auto:
-				if (
-					find_image(
-						window_region, 'screenshots/Button Auto green.png'
-					)
-					is None
-				):
+			if pos_Auto := wait_for_image(window_region, 'screenshots/Button Auto gray.png', 3):
+				if find_image(window_region, 'screenshots/Button Auto green.png') is None:
 					click_position(pos_Auto)
 					Auto_is_green = True
-		pos_ok = wait_for_image(window_region, 'screenshots/Button OK.png', 1)
-		if pos_ok:
+		if pos_ok := wait_for_image(window_region, 'screenshots/Button OK.png', 1):
 			click_position(pos_ok)
 			time.sleep(1.0)  # Wait a bit after clicking OK
 			break
