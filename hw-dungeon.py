@@ -29,7 +29,7 @@ options = {
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
-def get_location(window_region, template_path) -> Location:
+def get_locations(window_region, template_path) -> Location:
 	ret = Location()
 	screenshot = pyautogui.screenshot(region=window_region)
 	screen = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
@@ -51,7 +51,7 @@ def get_location(window_region, template_path) -> Location:
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def find_one_image(window_region, template_path):
-	location = get_location(window_region, template_path)
+	location = get_locations(window_region, template_path)
 	if location.pts:
 		# Randomly select a position among the matches
 		top_left = random.choice(location.pts)
@@ -61,7 +61,7 @@ def find_one_image(window_region, template_path):
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def find_all_images(window_region, template_path):
-	location = get_location(window_region, template_path)
+	location = get_locations(window_region, template_path)
 	if location.pts:
 		# Return all positions among the matches
 		return [(top_left[0] + location.w // 2, top_left[1] + location.h // 2) for top_left in location.pts]
@@ -180,9 +180,24 @@ while True:
 
 	pos_attack = None
 	pos_accept = None
+	pos_priority = None
 	start_time = time.time()
+	attack_image_path = 'screenshots/Button Attack.png'
 	while time.time() - start_time < 12:  # 12-second timeout
-		if pos_attack := wait_for_image(window_region, 'screenshots/Button Attack.png', 1):
+		if pos_attack := wait_for_image(window_region, attack_image_path, 1):
+			pts = find_all_images(window_region, attack_image_path)
+			if pts and len(pts) > 1:
+				#print(f"Multiple 'Attack' buttons found: {len(pts)}.") # DEBUG
+				for name in options['priority']:
+				#	print(f"Searching for priority button '{name}'...")
+					if pos_priority := find_one_image(window_region, f"screenshots/Titan {name}.png"):
+				#		print(f"Priority button '{name}' found at {pos_priority}.")
+						# Finding the nearest Attack button to the priority button
+						nearest_attack = min(pts, key=lambda p: math.hypot(p[0] - pos_priority[0], p[1] - pos_priority[1]))
+				#		print(f"Nearest 'Attack' button to '{name}' is at {nearest_attack}.")
+						click_position(nearest_attack)
+						break
+
 			click_position(pos_attack)
 			break
 		if pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1):
