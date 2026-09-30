@@ -1,36 +1,78 @@
-import random
-import time
 import cv2
+from dataclasses import dataclass, field
+import math
 import numpy as np
 import pyautogui
 import pygetwindow as gw
+import random
+import time
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
-def find_image(window_region, template_path):
+@dataclass
+class Location:
+	h: int = 0
+	w: int = 0
+	pts: list	= field(default_factory=list)
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+options = {
+	"x5": True,
+	"priority": [
+		"water",
+		"earth",
+		"team",
+		"fire",
+	],
+}
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+def get_location(window_region, template_path) -> Location:
+	ret = Location()
 	screenshot = pyautogui.screenshot(region=window_region)
 	screen = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 	template = cv2.imread(template_path)
 	if template is None:
 		print(f"Template image {template_path} not found.")
-		return None
-	h, w = template.shape[:2]
+		return ret
+	ret.h, ret.w = template.shape[:2]
 	result = cv2.matchTemplate(screen, template, cv2.TM_CCOEFF_NORMED)
 	# Get all positions >= 0.9
 	loc = np.where(result >= 0.9)
 	if pts := list(zip(*loc[::-1])): # List of tuples (x, y)
+		# Filter out points that are too close to each other
+		for pt in pts:
+			if not any(math.hypot(pt[0] - p[0], pt[1] - p[1]) < min(ret.w, ret.h) for p in ret.pts):
+				ret.pts.append(pt)
+	return ret
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+def find_one_image(window_region, template_path):
+	location = get_location(window_region, template_path)
+	if location.pts:
 		# Randomly select a position among the matches
-		top_left = random.choice(pts)
-		return (top_left[0] + w // 2, top_left[1] + h // 2)
-	else:
-		return None
+		top_left = random.choice(location.pts)
+		return (top_left[0] + location.w // 2, top_left[1] + location.h // 2)
+	return None
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+def find_all_images(window_region, template_path):
+	location = get_location(window_region, template_path)
+	if location.pts:
+		# Return all positions among the matches
+		return [(top_left[0] + location.w // 2, top_left[1] + location.h // 2) for top_left in location.pts]
+	return None
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def wait_for_image(window_region, template_path, timeout=10):
 	start_time = time.time()
 	while time.time() - start_time < timeout:
-		if position := find_image(window_region, template_path):
+		if position := find_one_image(window_region, template_path):
 			return position
 		time.sleep(0.2)  # Wait a bit before retrying
 	return None  # Return None if image is not found within the timeout
@@ -46,7 +88,7 @@ def click_position(position):
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 def click_image(window_region, template_path):
-	if position := find_image(window_region, template_path):
+	if position := find_one_image(window_region, template_path):
 		click_position(position)
 	else:
 		print(f"Image {template_path} not found on screen.")
@@ -197,15 +239,22 @@ while True:
 	# 7. "Auto" or "OK" button
 
 	Auto_is_green = False
+	x5_is_green = not options.get("x5", False)  # If x5 is not selected, consider it green
 	pos_Auto = None
+	pos_option_x5	= None
 	pos_ok = None
 	start_time = time.time()
 	while time.time() - start_time < 100:  # 100-second timeout
 		if not Auto_is_green:
 			if pos_Auto := wait_for_image(window_region, 'screenshots/Button Auto gray.png', 3):
-				if find_image(window_region, 'screenshots/Button Auto green.png') is None:
+				if find_one_image(window_region, 'screenshots/Button Auto green.png') is None:
 					click_position(pos_Auto)
 					Auto_is_green = True
+		if not x5_is_green:
+			if pos_option_x5 := wait_for_image(window_region, 'screenshots/Button x5 gray.png', 3):
+				if find_one_image(window_region, 'screenshots/Button x5 green.png') is None:
+					click_position(pos_option_x5)
+					x5_is_green = True
 		if pos_ok := wait_for_image(window_region, 'screenshots/Button OK.png', 1):
 			click_position(pos_ok)
 			time.sleep(1.0)  # Wait a bit after clicking OK
