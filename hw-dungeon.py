@@ -9,16 +9,8 @@ import time
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
-@dataclass
-class Location:
-	h: int = 0
-	w: int = 0
-	pts: list	= field(default_factory=list)
-
-#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-
 options = {
-	"x5": True,
+	"x5": False,
 	"priority": [
 		"water",
 		"earth",
@@ -26,6 +18,14 @@ options = {
 		"fire",
 	],
 }
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+@dataclass
+class Location:
+	h: int = 0
+	w: int = 0
+	pts: list	= field(default_factory=list)
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
@@ -178,6 +178,7 @@ while True:
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 	# 4. "Attack" or "Accept this fate" button
 
+	exit_while = False
 	pos_attack = None
 	pos_accept = None
 	pos_priority = None
@@ -185,20 +186,18 @@ while True:
 	attack_image_path = 'screenshots/Button Attack.png'
 	while time.time() - start_time < 12:  # 12-second timeout
 		if pos_attack := wait_for_image(window_region, attack_image_path, 1):
-			pts = find_all_images(window_region, attack_image_path)
-			if pts and len(pts) > 1:
-				#print(f"Multiple 'Attack' buttons found: {len(pts)}.") # DEBUG
+			if (pts := find_all_images(window_region, attack_image_path)) and len(pts) > 1:
 				for name in options['priority']:
-				#	print(f"Searching for priority button '{name}'...")
 					if pos_priority := find_one_image(window_region, f"screenshots/Titan {name}.png"):
-				#		print(f"Priority button '{name}' found at {pos_priority}.")
 						# Finding the nearest Attack button to the priority button
 						nearest_attack = min(pts, key=lambda p: math.hypot(p[0] - pos_priority[0], p[1] - pos_priority[1]))
-				#		print(f"Nearest 'Attack' button to '{name}' is at {nearest_attack}.")
 						click_position(nearest_attack)
+						exit_while = True
 						break
-
-			click_position(pos_attack)
+			else:
+				click_position(pos_attack)
+				break
+		if exit_while:
 			break
 		if pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1):
 			click_position(pos_accept)
@@ -261,7 +260,7 @@ while True:
 	start_time = time.time()
 	while time.time() - start_time < 100:  # 100-second timeout
 		if not Auto_is_green:
-			if pos_Auto := wait_for_image(window_region, 'screenshots/Button Auto gray.png', 3):
+			if pos_Auto := wait_for_image(window_region, 'screenshots/Button Auto gray.png', 5):
 				if find_one_image(window_region, 'screenshots/Button Auto green.png') is None:
 					click_position(pos_Auto)
 					Auto_is_green = True
