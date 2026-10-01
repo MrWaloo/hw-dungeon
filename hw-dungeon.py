@@ -11,6 +11,8 @@ import time
 
 options = {
 	"x5": False,
+	"use_divination_cards_for_heros": True,
+	"use_divination_cards_for_titans": False,
 	"priority": [
 		"water",
 		"earth",
@@ -137,6 +139,8 @@ if pos_oracle := wait_for_image(window_region, 'screenshots/Button Oracle\'s Tri
 battles = 0
 retries = 0
 door_found = None
+round_heros = False
+round_titans = False
 while True:
 	battles += 1
 
@@ -150,10 +154,13 @@ while True:
 	while time.time() - start_time < 20:  # 20-second timeout
 		door_priority = door_found is not None and (battles - door_found) % 10 == 0
 		if (not door_priority or is_activated) and (pos_door := wait_for_image(window_region, 'screenshots/Door To battle.png', 1)):
+			round_heros = find_one_image(window_region, f"screenshots/Door Heros.png")
+			round_titans = find_one_image(window_region, f"screenshots/Door Titans.png")
 			click_position(pos_door)
+			team_type = "heros" if round_heros else "titans" if round_titans else "unknown"
 			print(
 				f"{time.strftime('%Y-%m-%d %H:%M:%S')}: Door found,"
-				f" starting battle #{battles}."
+				f" starting {team_type} battle #{battles}."
 			)
 			break
 		if not is_activated:
@@ -175,12 +182,22 @@ while True:
 		print("Door not found within the timeout.")
 		exit(1)
 
+	accept_condition = (
+		(options.get("use_divination_cards_for_heros", False) and round_heros)
+		or (options.get("use_divination_cards_for_titans", False) and round_titans)
+	)
+	fight_condition = (
+		(not options.get("use_divination_cards_for_heros", False) and round_heros)
+		or (not options.get("use_divination_cards_for_titans", False) and round_titans)
+	)
+
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 4. "Attack" or "Accept this fate" button
+	# 4. "Attack", "Accept this fate" or "Fight on your own" button
 
 	exit_while = False
 	pos_attack = None
 	pos_accept = None
+	pos_fight = None
 	pos_priority = None
 	start_time = time.time()
 	attack_image_path = 'screenshots/Button Attack.png'
@@ -199,12 +216,15 @@ while True:
 				break
 		if exit_while:
 			break
-		if pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1):
+		if accept_condition and (pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1)):
 			click_position(pos_accept)
 			break
+		if fight_condition and (pos_fight := wait_for_image(window_region, 'screenshots/Button Fight on your own.png', 1)):
+			click_position(pos_fight)
+			break
 
-	if not pos_attack and not pos_accept:
-		print("'Attack' or 'Accept this fate' button not found within the timeout.")
+	if not pos_attack and not pos_accept and not pos_fight:
+		print("'Attack', 'Accept this fate' or 'Fight on your own' button not found within the timeout.")
 		retries += 1
 		if retries >= 3:
 			exit(1)
@@ -216,23 +236,27 @@ while True:
 		continue  # Restart the loop after accepting fate
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 5. "To battle" or "Accept this fate" button
+	# 5. "To battle", "Accept this fate" or "Fight on your own" button
 
 	retries = 0
 	pos_to_battle = None
 	pos_accept = None
+	pos_fight = None
 	start_time = time.time()
 	while time.time() - start_time < 12:  # 12-second timeout
 		if pos_to_battle := wait_for_image(window_region, 'screenshots/Button To battle.png', 1):
 			click_position(pos_to_battle)
 			break
-		if pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1):
+		if accept_condition and (pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1)):
 			click_position(pos_accept)
 			break
+		if fight_condition and (pos_fight := wait_for_image(window_region, 'screenshots/Button Fight on your own.png', 1)):
+			click_position(pos_fight)
+			break
 
-	if not pos_to_battle and not pos_accept:
+	if not pos_to_battle and not pos_accept and not pos_fight:
 		print(
-			"'To battle' or 'Accept this fate' button not found within the"
+			"'To battle', 'Accept this fate' or 'Fight on your own' button not found within the"
 			' timeout.'
 		)
 		exit(1)
