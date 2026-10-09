@@ -2,9 +2,11 @@ import cv2
 from dataclasses import dataclass, field
 import math
 import numpy as np
+import os
 import pyautogui
 import pygetwindow as gw
 import random
+import re
 import time
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
@@ -15,11 +17,20 @@ options = {
 	"use_divination_cards_for_titans": False,
 	"priority": [
 		"water",
-		"earth",
 		"team",
+		"earth",
 		"fire",
 	],
+	"with-tesseract": False, # don't modify this option, it will be set automatically if tesseract is found
 }
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if os.path.isfile(tesseract_cmd):
+	import pytesseract
+	pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+	options["with-tesseract"] = True
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
@@ -52,6 +63,22 @@ def get_locations(window_region, template_path) -> Location:
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
+def read_dungeon_level(window_region):
+	location = get_locations(window_region, 'screenshots/Text Clear Dungeon level.png')
+	if location.pts:
+		# Randomly select a position among the matches
+		top_left = random.choice(location.pts)
+		screenshot = pyautogui.screenshot(region=(int(top_left[0]), int(top_left[1] - location.h // 4), int(location.w * 2), int(location.h * 1.5)))
+		gray = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2GRAY)
+		#cv2.imwrite("capture_gray.png", gray)
+		text = pytesseract.image_to_string(gray, config='--psm 7')
+		# Extract the level number using regex
+		if match := re.search(r'\((\d+)\/\d+\)', text):
+			return match.group(1)
+	return "*not readable*"
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
 def find_one_image(window_region, template_path):
 	location = get_locations(window_region, template_path)
 	if location.pts:
@@ -76,7 +103,23 @@ def wait_for_image(window_region, template_path, timeout=10):
 	while time.time() - start_time < timeout:
 		if position := find_one_image(window_region, template_path):
 			return position
-		time.sleep(0.2)  # Wait a bit before retrying
+		time.sleep(0.1)  # Wait a bit before retrying
+	return None  # Return None if image is not found within the timeout
+
+#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+def wait_for_stable_image(window_region, template_path, timeout=10):
+	start_time = time.time()
+	position = None
+	while time.time() - start_time < timeout:
+		position_old = position
+		if (position := find_one_image(window_region, template_path)):
+			if position_old is not None and math.hypot(position[0] - position_old[0], position[1] - position_old[1]) < window_region[3] // 16:
+				return position
+			elif position_old is None:
+				time.sleep(0.5)  # Let some time pass to check for stability
+		else:
+			time.sleep(0.1)  # Wait a bit before retrying
 	return None  # Return None if image is not found within the timeout
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
@@ -108,7 +151,7 @@ if windows := gw.getWindowsWithTitle('Hero Wars | Online action game | RPG'):
 
 	# Bring window to foreground (optional)
 	window.activate()
-	time.sleep(1.0)
+	time.sleep(0.5)
 
 	# Extract coordinates and dimensions: (left, top, width, height)
 	window_region = (window.left, window.top, window.width, window.height)
@@ -128,7 +171,7 @@ if pos_oracle := wait_for_image(window_region, 'screenshots/Button Oracle\'s Tri
 
 	if pos_close := wait_for_image(window_region, 'screenshots/Button Close Oracle\'s Trials.png', 1):
 		click_position(pos_close)
-		time.sleep(0.5)  # Wait a bit after clicking close
+		time.sleep(2.0)  # Wait a bit after clicking close
 	else:
 		print("'Close' button not found after claiming divination cards.")
 		exit(1)
@@ -140,55 +183,69 @@ battles = 0
 retries = 0
 door_found = None
 round_heros = False
-round_titans = False
+level = ''
+last_level = 0
+inc_level_once = False
+Auto_is_green = False
 while True:
 	battles += 1
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 	# 3. Find the door ("To battle!" flag) or activate the door to be activated
 
-	pos_door = None
 	pos_activate = None
 	is_activated = False
 	start_time = time.time()
+	door_ok = False
+	door_battle = 'screenshots/Door To battle.png'
 	while time.time() - start_time < 20:  # 20-second timeout
 		door_priority = door_found is not None and (battles - door_found) % 10 == 0
-		if (not door_priority or is_activated) and (pos_door := wait_for_image(window_region, 'screenshots/Door To battle.png', 1)):
-			round_heros = find_one_image(window_region, f"screenshots/Door Heros.png")
-			round_titans = find_one_image(window_region, f"screenshots/Door Titans.png")
-			click_position(pos_door)
-			team_type = "heros" if round_heros else "titans" if round_titans else "unknown"
+		if (not door_priority or is_activated) and wait_for_stable_image(window_region, door_battle, 3):
+			level_log = ""
+			if options["with-tesseract"]:
+				level = read_dungeon_level(window_region)
+				if int(level) == last_level:
+					last_level = int(level)
+					level = str(last_level + 1) if inc_level_once else str(level) + "+"
+				else:
+					last_level = int(level)
+					level = str(int(level) + 1)
+					inc_level_once = True
+				level_log = f"level: {level} "
+			round_heros = find_one_image(window_region, f"screenshots/Door Heros.png") is not None
+			click_position(find_one_image(window_region, door_battle))
+			team_type = "heros" if round_heros else "titans"
 			print(
 				f"{time.strftime('%Y-%m-%d %H:%M:%S')}: Door found,"
-				f" starting {team_type} battle #{battles}."
+				f" starting {team_type} {level_log}battle #{battles}."
 			)
+			door_ok = True
 			break
-		if not is_activated:
-			if pos_activate := wait_for_image(window_region, 'screenshots/Button Activate.png', 1):
-				door_found = battles  # Record the battle number when the door was found
-				start_time = time.time()
-				click_position(pos_activate)
-				if pos_collect := wait_for_image(window_region, 'screenshots/Button Collect.png', 10):
-					click_position(pos_collect)
-					print("Activation and collection completed.")
-					time.sleep(1.0)  # Wait a bit after collection
-					is_activated = True
-				else:
-					print("'Collect' button not found after activation.")
-					exit(1)
-				continue
+		if not is_activated and (pos_activate := wait_for_image(window_region, 'screenshots/Button Activate.png', 1)):
+			door_found = battles
+			start_time = time.time()
+			click_position(pos_activate)
+			if pos_collect := wait_for_image(window_region, 'screenshots/Button Collect.png', 10):
+				click_position(pos_collect)
+				print("Activation and collection completed.")
+				time.sleep(2.0)  # Wait a bit after collection
+				is_activated = True
+			else:
+				print("'Collect' button not found after activation.")
+				exit(1)
+			continue
 
-	if not pos_door:
+	if not door_ok:
 		print("Door not found within the timeout.")
 		exit(1)
 
 	accept_condition = (
 		(options.get("use_divination_cards_for_heros", False) and round_heros)
-		or (options.get("use_divination_cards_for_titans", False) and round_titans)
+		or (options.get("use_divination_cards_for_titans", False) and not round_heros)
 	)
 	fight_condition = (
 		(not options.get("use_divination_cards_for_heros", False) and round_heros)
-		or (not options.get("use_divination_cards_for_titans", False) and round_titans)
+		or (not options.get("use_divination_cards_for_titans", False) and not round_heros)
 	)
 
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
@@ -219,11 +276,11 @@ while True:
 		if accept_condition and (pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1)):
 			click_position(pos_accept)
 			break
-		if fight_condition and (pos_fight := wait_for_image(window_region, 'screenshots/Button Fight on your own.png', 1)):
+		if (fight_condition or (not accept_condition and not fight_condition)) and (pos_fight := wait_for_image(window_region, 'screenshots/Button Fight on your own.png', 1)):
 			click_position(pos_fight)
 			break
 
-	if not pos_attack and not pos_accept and not pos_fight:
+	if pos_attack is None and pos_accept is None and pos_fight is None:
 		print("'Attack', 'Accept this fate' or 'Fight on your own' button not found within the timeout.")
 		retries += 1
 		if retries >= 3:
@@ -250,11 +307,11 @@ while True:
 		if accept_condition and (pos_accept := wait_for_image(window_region, 'screenshots/Button Accept this fate.png', 1)):
 			click_position(pos_accept)
 			break
-		if fight_condition and (pos_fight := wait_for_image(window_region, 'screenshots/Button Fight on your own.png', 1)):
+		if (fight_condition or (not accept_condition and not fight_condition)) and (pos_fight := wait_for_image(window_region, 'screenshots/Button Fight on your own.png', 1)):
 			click_position(pos_fight)
 			break
 
-	if not pos_to_battle and not pos_accept and not pos_fight:
+	if pos_to_battle is None and pos_accept is None and pos_fight is None:
 		print(
 			"'To battle', 'Accept this fate' or 'Fight on your own' button not found within the"
 			' timeout.'
@@ -276,7 +333,6 @@ while True:
 	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 	# 7. "Auto" or "OK" button
 
-	Auto_is_green = False
 	x5_is_green = not options.get("x5", False)  # If x5 is not selected, consider it green
 	pos_Auto = None
 	pos_option_x5	= None
@@ -288,6 +344,8 @@ while True:
 				if find_one_image(window_region, 'screenshots/Button Auto green.png') is None:
 					click_position(pos_Auto)
 					Auto_is_green = True
+			if find_one_image(window_region, 'screenshots/Button Auto green.png') is not None:
+				Auto_is_green = True
 		if not x5_is_green:
 			if pos_option_x5 := wait_for_image(window_region, 'screenshots/Button x5 gray.png', 3):
 				if find_one_image(window_region, 'screenshots/Button x5 green.png') is None:
@@ -298,6 +356,6 @@ while True:
 			time.sleep(1.0)  # Wait a bit after clicking OK
 			break
 
-	if not pos_Auto and not pos_ok:
+	if pos_Auto is None and pos_ok is None:
 		print("'Auto' or 'OK' button not found within the timeout.")
 		exit(1)
