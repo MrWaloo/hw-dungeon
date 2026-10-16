@@ -12,7 +12,7 @@ import time
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 options = {
-	"x5": False,
+	"x5": True,
 	"use_divination_cards_for_heros": True,
 	"use_divination_cards_for_titans": False,
 	"priority": [
@@ -31,6 +31,7 @@ if os.path.isfile(tesseract_cmd):
 	import pytesseract
 	pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 	options["with-tesseract"] = True
+	print(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: Tesseract OCR found and enabled.")
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
@@ -46,8 +47,7 @@ def get_locations(window_region, template_path) -> Location:
 	ret = Location()
 	screenshot = pyautogui.screenshot(region=window_region)
 	screen = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-	template = cv2.imread(template_path)
-	if template is None:
+	if (template := cv2.imread(template_path)) is None:
 		print(f"Template image {template_path} not found.")
 		return ret
 	ret.h, ret.w = template.shape[:2]
@@ -68,9 +68,9 @@ def read_dungeon_level(window_region):
 	if location.pts:
 		# Randomly select a position among the matches
 		top_left = random.choice(location.pts)
-		screenshot = pyautogui.screenshot(region=(int(top_left[0]), int(top_left[1] - location.h // 4), int(location.w * 2), int(location.h * 1.5)))
+		screenshot = pyautogui.screenshot(region=(int(top_left[0] + window_region[0]), int(top_left[1] + window_region[1] - location.h // 4), int(location.w * 2.5), int(location.h * 1.5)))
 		gray = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2GRAY)
-		#cv2.imwrite("capture_gray.png", gray)
+		#cv2.imwrite(f"capture_gray_{time.strftime('%Y-%m-%d %H_%M_%S')}.png", gray) # DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG
 		text = pytesseract.image_to_string(gray, config='--psm 7')
 		# Extract the level number using regex
 		if match := re.search(r'\((\d+)\/\d+\)', text):
@@ -113,7 +113,7 @@ def wait_for_stable_image(window_region, template_path, timeout=10):
 	position = None
 	while time.time() - start_time < timeout:
 		position_old = position
-		if (position := find_one_image(window_region, template_path)):
+		if position := find_one_image(window_region, template_path):
 			if position_old is not None and math.hypot(position[0] - position_old[0], position[1] - position_old[1]) < window_region[3] // 16:
 				return position
 			elif position_old is None:
@@ -175,6 +175,8 @@ if pos_oracle := wait_for_image(window_region, 'screenshots/Button Oracle\'s Tri
 	else:
 		print("'Close' button not found after claiming divination cards.")
 		exit(1)
+else:
+	print(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: No 'Oracle's Trials' available.")
 
 #-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 # 2. Loop
@@ -203,15 +205,15 @@ while True:
 		if (not door_priority or is_activated) and wait_for_stable_image(window_region, door_battle, 3):
 			level_log = ""
 			if options["with-tesseract"]:
-				level = read_dungeon_level(window_region)
-				if int(level) == last_level:
-					last_level = int(level)
-					level = str(last_level + 1) if inc_level_once else str(level) + "+"
-				else:
-					last_level = int(level)
-					level = str(int(level) + 1)
-					inc_level_once = True
-				level_log = f"level: {level} "
+				if (level := read_dungeon_level(window_region)) != "*not readable*":
+					if int(level) == last_level:
+						last_level = int(level)
+						level = str(last_level + 1) if inc_level_once else str(level) + "+"
+					else:
+						last_level = int(level)
+						level = str(int(level) + 1)
+						inc_level_once = True
+					level_log = f"level: {level} "
 			round_heros = find_one_image(window_region, f"screenshots/Door Heros.png") is not None
 			click_position(find_one_image(window_region, door_battle))
 			team_type = "heros" if round_heros else "titans"
@@ -340,12 +342,12 @@ while True:
 	start_time = time.time()
 	while time.time() - start_time < 100:  # 100-second timeout
 		if not Auto_is_green:
+			if find_one_image(window_region, 'screenshots/Button Auto green.png') is not None:
+				Auto_is_green = True
 			if pos_Auto := wait_for_image(window_region, 'screenshots/Button Auto gray.png', 5):
 				if find_one_image(window_region, 'screenshots/Button Auto green.png') is None:
 					click_position(pos_Auto)
 					Auto_is_green = True
-			if find_one_image(window_region, 'screenshots/Button Auto green.png') is not None:
-				Auto_is_green = True
 		if not x5_is_green:
 			if pos_option_x5 := wait_for_image(window_region, 'screenshots/Button x5 gray.png', 3):
 				if find_one_image(window_region, 'screenshots/Button x5 green.png') is None:
