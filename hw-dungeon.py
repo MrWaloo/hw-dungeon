@@ -16,8 +16,8 @@ options = {
 	"use_divination_cards_for_heros": True,
 	"use_divination_cards_for_titans": False,
 	"priority": [
-		"water",
 		"team",
+		"water",
 		"earth",
 		"fire",
 	],
@@ -117,7 +117,7 @@ def wait_for_stable_image(window_region, template_path, timeout=10):
 			if position_old is not None and math.hypot(position[0] - position_old[0], position[1] - position_old[1]) < window_region[3] // 16:
 				return position
 			elif position_old is None:
-				time.sleep(0.5)  # Let some time pass to check for stability
+				time.sleep(1.0)  # Let some time pass to check for stability
 		else:
 			time.sleep(0.1)  # Wait a bit before retrying
 	return None  # Return None if image is not found within the timeout
@@ -206,9 +206,12 @@ while True:
 			level_log = ""
 			if options["with-tesseract"]:
 				if (level := read_dungeon_level(window_region)) != "*not readable*":
-					if int(level) == last_level:
+					if last_level == 0:
 						last_level = int(level)
-						level = str(last_level + 1) if inc_level_once else str(level) + "+"
+						level += "?"
+					elif int(level) == last_level:
+						#last_level = int(level) # useless
+						level = str(last_level + 1) if inc_level_once else "less than " + str(last_level + 1)
 					else:
 						last_level = int(level)
 						level = str(int(level) + 1)
@@ -230,8 +233,12 @@ while True:
 			if pos_collect := wait_for_image(window_region, 'screenshots/Button Collect.png', 10):
 				click_position(pos_collect)
 				print("Activation and collection completed.")
-				time.sleep(2.0)  # Wait a bit after collection
 				is_activated = True
+				if pos_complete := wait_for_image(window_region, 'screenshots/Button Complete.png', 3):
+					click_position(pos_complete)
+					if pos_collect2 := wait_for_image(window_region, 'screenshots/Button Collect quest reward.png', 10):
+						click_position(pos_collect2)
+						print("Quest reward collected.")
 			else:
 				print("'Collect' button not found after activation.")
 				exit(1)
@@ -241,6 +248,9 @@ while True:
 		print("Door not found within the timeout.")
 		exit(1)
 
+	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+	# 4. "Attack", "Accept this fate" or "Fight on your own" button
+
 	accept_condition = (
 		(options.get("use_divination_cards_for_heros", False) and round_heros)
 		or (options.get("use_divination_cards_for_titans", False) and not round_heros)
@@ -249,10 +259,6 @@ while True:
 		(not options.get("use_divination_cards_for_heros", False) and round_heros)
 		or (not options.get("use_divination_cards_for_titans", False) and not round_heros)
 	)
-
-	#-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-	# 4. "Attack", "Accept this fate" or "Fight on your own" button
-
 	exit_while = False
 	pos_attack = None
 	pos_accept = None
